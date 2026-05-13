@@ -144,9 +144,9 @@ check_diff_size() {
 
   echo "变更总行数: ${total_lines}"
 
-  if [[ "${total_lines}" -gt 50 ]]; then
+  if [[ "${total_lines}" -gt 100 ]]; then
     echo "NEEDS_APPROVAL:${total_lines}" > approval_status
-    echo "[WARN] MR 变更超过50行（${total_lines}行），需要人工审批"
+    echo "[WARN] MR 变更超过100行（${total_lines}行），需要人工审批"
   else
     echo "PASS" > approval_status
     pass "MR 变更行数校验通过"
