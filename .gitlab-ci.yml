@@ -1,0 +1,40 @@
+stages:
+  - gate
+  - approve
+
+variables:
+  GIT_DEPTH: "0"
+
+git_gate:
+  stage: gate
+  tags:
+    - shell
+  script:
+    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE"
+    - echo "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
+    - echo "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+    - echo "CI_MERGE_REQUEST_TARGET_BRANCH_NAME=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - chmod +x scripts/git_gate.sh
+    - ./scripts/git_gate.sh
+  artifacts:
+    paths:
+      - approval_status
+    expire_in: 1h
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+approval:
+  stage: approve
+  tags:
+    - shell
+  needs:
+    - git_gate
+  script:
+    - chmod +x scripts/approval.sh
+    - ./scripts/approval.sh
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
