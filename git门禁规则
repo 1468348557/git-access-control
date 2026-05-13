@@ -23,7 +23,7 @@ Git 门禁规则
 | hotfix | `^hotfix-[0-9]{8}$` | `hotfix-20260513` |
 | release | `^release-[0-9]{8}$` | `release-20260513` |
 | comp | `^comp-` | `comp-*`（任意内容） |
-| feature | `^feature-` | `feature-*`（任意内容） |
+| feature | `^feature/` | `feature/*`（任意内容） |
 
 ---
 
