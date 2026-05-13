@@ -51,8 +51,11 @@ BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8
 check_date_valid() {
   local date_part="$1"
   local formatted_date
-  if ! formatted_date=$(date -d "$date_part" +"%Y%m%d" 2>/dev/null); then
-    return 1
+  # macOS 用 date -j，Linux 用 date -d
+  if date --version 2>/dev/null | grep -q GNU; then
+    formatted_date="$(date -d "$date_part" +"%Y%m%d" 2>/dev/null)" || return 1
+  else
+    formatted_date="$(date -j -f "%Y%m%d" "$date_part" +"%Y%m%d" 2>/dev/null)" || return 1
   fi
   [[ "$formatted_date" == "$date_part" ]]
 }
