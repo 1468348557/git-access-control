@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# pre-push hook: 仅校验分支命名，不合法则拒绝推送
+set -euo pipefail
+
+fail() {
+  echo ""
+  echo "[HOOK FAIL] $1"
+  echo ""
+  exit 1
+}
+
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp-|feature-)'
+
+check_date_valid() {
+  local date_part="$1"
+  local formatted_date
+  if ! formatted_date=$(date -d "$date_part" +"%Y%m%d" 2>/dev/null); then
+    return 1
+  fi
+  [[ "$formatted_date" == "$date_part" ]]
+}
+
+# Git 推送时 hook 传递的 refs: local_ref local_sha remote_ref remote_sha
+while read -r local_ref local_sha remote_ref remote_sha; do
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+
+  # 只校验当前分支
+  echo "[pre-push] 检查分支命名: $branch"
+
+  if [[ ! "$branch" =~ $BRANCH_PATTERN ]]; then
+    fail "分支命名不符合规范: $branch
+允许格式:
+  1. FIX-YYYYMMDD-NNNN[-名称]
+  2. REQ-YYYYMMDD-NNNN[-名称]
+  3. PUB-YYYYMMDD-NNNN[-名称]
+  4. hotfix-YYYYMMDD
+  5. release-YYYYMMDD
+  6. comp-*
+  7. feature-*"
+  fi
+
+  local date_part=""
+  if [[ "$branch" =~ ^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4} ]] || \
+     [[ "$branch" =~ ^(hotfix|release)-[0-9]{8} ]]; then
+    date_part="$(echo "$branch" | awk -F- '{print $2}')"
+  fi
+
+  if [[ -n "$date_part" ]]; then
+    if ! check_date_valid "$date_part"; then
+      fail "分支名中的日期不合法: $date_part"
+    fi
+  fi
+
+  echo "[pre-push] PASS"
+done
+
+exit 0
