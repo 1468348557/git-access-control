@@ -22,8 +22,8 @@ Git 门禁规则
 | PUB（公共） | `^PUB-[0-9]{8}-[0-9]{4}(-.+)?$` | `PUB-20260513-0001` 或 `PUB-20260513-0001-发布描述` |
 | hotfix | `^hotfix-[0-9]{8}$` | `hotfix-20260513` |
 | release | `^release-[0-9]{8}$` | `release-20260513` |
-| comp | `^comp-` | `comp-*`（任意内容） |
-| feature | `^feature/` | `feature/*`（任意内容） |
+| comp | `^comp` | `comp*`（任意内容） |
+| feature | `^feature` | `feature*`（任意内容） |
 
 ---
 

@@ -37,8 +37,8 @@ fail() {
   echo -e "    ${GREEN}release-YYYYMMDD${NC}        例如 release-20260513"
   echo ""
   echo "  其他:"
-  echo -e "    ${GREEN}comp-*${NC}                  例如 comp-refactor"
-  echo -e "    ${GREEN}feature/*${NC}               例如 feature/new-ui  feature/cht"
+  echo -e "    ${GREEN}comp*${NC}                  例如 comp-xxx"
+  echo -e "    ${GREEN}feature*${NC}               例如 feature-xxx  feature/yyy"
   echo ""
   echo -e "${BOLD}提示:${NC} 日期部分必须是真实存在的日期(YYYYMMDD)"
   echo -e "${BOLD}修改分支名:${NC} git branch -m ${branch} FIX-$(date +%Y%m%d)-0001"
@@ -46,7 +46,7 @@ fail() {
   exit 1
 }
 
-BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp-|feature/)'
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature)'
 
 check_date_valid() {
   local date_part="$1"
