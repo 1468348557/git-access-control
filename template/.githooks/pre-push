@@ -64,7 +64,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     fail "$branch" "分支名不符合任何允许的格式"
   fi
 
-  local date_part=""
+  date_part=""
   if [[ "$branch" =~ ^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4} ]] || \
      [[ "$branch" =~ ^(hotfix|release)-[0-9]{8} ]]; then
     date_part="$(echo "$branch" | awk -F- '{print $2}')"
