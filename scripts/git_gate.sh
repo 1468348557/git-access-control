@@ -8,11 +8,13 @@ PIPELINE_SOURCE="${CI_PIPELINE_SOURCE:-}"
 MR_SOURCE_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 MR_TARGET_BRANCH="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
 
-BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}|(hotfix|release)-[0-9]{8})$'
-BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}$'
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp-|feature-)'
+BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?$'
 HOTFIX_BRANCH_PATTERN='^hotfix-[0-9]{8}$'
 RELEASE_BRANCH_PATTERN='^release-[0-9]{8}$'
-UAT_TARGET_PATTERN='^uat(_[0-9]{8})?$'
+COMP_BRANCH_PATTERN='^comp-'
+FEATURE_BRANCH_PATTERN='^feature-'
+UAT_TARGET_PATTERN='^uat'
 
 fail() {
   echo ""
@@ -44,11 +46,13 @@ check_branch_name() {
   if [[ ! "$branch" =~ $BRANCH_PATTERN ]]; then
     fail "分支命名不符合规范: $branch
 允许格式:
-  1. FIX-YYYYMMDD-NNNN
-  2. REQ-YYYYMMDD-NNNN
-  3. PUB-YYYYMMDD-NNNN
+  1. FIX-YYYYMMDD-NNNN[-额外名称]
+  2. REQ-YYYYMMDD-NNNN[-额外名称]
+  3. PUB-YYYYMMDD-NNNN[-额外名称]
   4. hotfix-YYYYMMDD
-  5. release-YYYYMMDD"
+  5. release-YYYYMMDD
+  6. comp-*
+  7. feature-*"
   fi
 
   local date_part=""
@@ -70,6 +74,14 @@ check_branch_name() {
   pass "分支命名校验通过"
 }
 
+# 判断源分支是否为业务/comp/feature 类型
+is_uat_style_source() {
+  local branch="$1"
+  [[ "$branch" =~ $BUSINESS_BRANCH_PATTERN ]] || \
+  [[ "$branch" =~ $COMP_BRANCH_PATTERN ]] || \
+  [[ "$branch" =~ $FEATURE_BRANCH_PATTERN ]]
+}
+
 # 2. 合并方向校验
 check_merge_direction() {
   local source_branch="$1"
@@ -77,15 +89,18 @@ check_merge_direction() {
 
   echo "检查合并方向: ${source_branch} -> ${target_branch}"
 
-  if [[ "$source_branch" =~ $BUSINESS_BRANCH_PATTERN ]]; then
-    if [[ "$target_branch" =~ $UAT_TARGET_PATTERN ]]; then
-      pass "业务分支合并方向校验通过"
+  if is_uat_style_source "${source_branch}"; then
+    if [[ "$target_branch" =~ $UAT_TARGET_PATTERN ]] || \
+       [[ "$target_branch" =~ $HOTFIX_BRANCH_PATTERN ]] || \
+       [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
+      pass "合并方向校验通过"
       return 0
     else
       fail "不允许的合并方向: ${source_branch} -> ${target_branch}
 允许方向:
-  - FIX/REQ/PUB -> uat
-  - FIX/REQ/PUB -> uat_YYYYMMDD"
+  - FIX/REQ/PUB/comp/feature -> uat*
+  - FIX/REQ/PUB/comp/feature -> hotfix
+  - FIX/REQ/PUB/comp/feature -> release"
     fi
   fi
 
@@ -115,7 +130,6 @@ check_merge_direction() {
 }
 
 # 3. MR 变更行数校验
-# 超过100行写入标志文件，由后续 manual job 负责审批
 check_diff_size() {
   local source_branch="$1"
   local target_branch="$2"
@@ -130,9 +144,9 @@ check_diff_size() {
 
   echo "变更总行数: ${total_lines}"
 
-  if [[ "${total_lines}" -gt 100 ]]; then
+  if [[ "${total_lines}" -gt 50 ]]; then
     echo "NEEDS_APPROVAL:${total_lines}" > approval_status
-    echo "[WARN] MR 变更超过100行（${total_lines}行），需要人工审批"
+    echo "[WARN] MR 变更超过50行（${total_lines}行），需要人工审批"
   else
     echo "PASS" > approval_status
     pass "MR 变更行数校验通过"
@@ -140,15 +154,18 @@ check_diff_size() {
 }
 
 # 4. 合并前基线校验
-# 源分支必须包含目标分支最新提交
 check_merge_base() {
   local source_branch="$1"
   local target_branch="$2"
 
-  # 业务分支从 master 拉出，合到 uat 时不检查基线
-  if [[ "$source_branch" =~ $BUSINESS_BRANCH_PATTERN ]] && [[ "$target_branch" =~ $UAT_TARGET_PATTERN ]]; then
-    echo "业务分支 -> uat，跳过基线校验（源分支基于 master）"
-    return 0
+  # 业务/comp/feature 分支从 master 拉出，合到 uat*/hotfix/release 时不检查基线
+  if is_uat_style_source "${source_branch}"; then
+    if [[ "$target_branch" =~ $UAT_TARGET_PATTERN ]] || \
+       [[ "$target_branch" =~ $HOTFIX_BRANCH_PATTERN ]] || \
+       [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
+      echo "基于 master 的分支 -> ${target_branch}，跳过基线校验"
+      return 0
+    fi
   fi
 
   echo "检查基线同步: ${source_branch} 是否包含 ${target_branch} 最新提交"
@@ -206,4 +223,3 @@ main() {
 }
 
 main "$@"
-

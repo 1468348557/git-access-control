@@ -17,11 +17,13 @@ Git 门禁规则
 
 | 类型 | 正则 | 示例 |
 |---|---|---|
-| FIX（缺陷修复） | `^FIX-[0-9]{8}-[0-9]{4}$` | `FIX-20260513-0001` |
-| REQ（需求） | `^REQ-[0-9]{8}-[0-9]{4}$` | `REQ-20260513-0001` |
-| PUB（发布） | `^PUB-[0-9]{8}-[0-9]{4}$` | `PUB-20260513-0001` |
+| FIX（缺陷修复） | `^FIX-[0-9]{8}-[0-9]{4}(-.+)?$` | `FIX-20260513-0001` 或 `FIX-20260513-0001-修复描述` |
+| REQ（需求） | `^REQ-[0-9]{8}-[0-9]{4}(-.+)?$` | `REQ-20260513-0001` 或 `REQ-20260513-0001-需求描述` |
+| PUB（公共） | `^PUB-[0-9]{8}-[0-9]{4}(-.+)?$` | `PUB-20260513-0001` 或 `PUB-20260513-0001-发布描述` |
 | hotfix | `^hotfix-[0-9]{8}$` | `hotfix-20260513` |
 | release | `^release-[0-9]{8}$` | `release-20260513` |
+| comp | `^comp-` | `comp-*`（任意内容） |
+| feature | `^feature-` | `feature-*`（任意内容） |
 
 ---
 
@@ -31,7 +33,9 @@ Git 门禁规则
 
 | 源分支 | 目标分支 |
 |---|---|
-| FIX / REQ / PUB | `uat` 或 `uat_YYYYMMDD` |
+| FIX / REQ / PUB | `uat` 开头 / `hotfix` / `release` |
+| comp | `uat` 开头 / `hotfix` / `release` |
+| feature | `uat` 开头 / `hotfix` / `release` |
 | hotfix | `master` |
 | release | `master` |
 
@@ -39,9 +43,12 @@ Git 门禁规则
 
 ## 3. MR 变更行数校验（仅 MR）
 
-- 计算源分支相对于目标分支的变更行数（新增 + 删除）
-- ≤ 100 行：自动通过，写入 `PASS` 标记
-- > 100 行：写入 `NEEDS_APPROVAL` 标记，触发 Stage 2 人工审批
+计算源分支相对于目标分支的变更行数（新增 + 删除）：
+
+| 条件 | 结果 |
+|---|---|
+| ≤ 50 行 | 自动通过，写入 `PASS` 标记 |
+| > 50 行 | 写入 `NEEDS_APPROVAL:<行数>` 标记，触发人工审批 |
 
 ---
 
@@ -51,7 +58,8 @@ Git 门禁规则
 
 | 合并方向 | 是否检查 | 说明 |
 |---|---|---|
-| FIX/REQ/PUB → uat | 跳过 | 业务分支基于 master，与 uat 无继承关系 |
+| FIX/REQ/PUB/comp/feature → uat* | 跳过 | 基于 master，与 uat 无继承关系 |
+| FIX/REQ/PUB/comp/feature → hotfix/release | 跳过 | 基于 master，与 hotfix/release 无继承关系 |
 | hotfix → master | 检查 | 源分支必须包含 master 最新提交 |
 | release → master | 检查 | 源分支必须包含 master 最新提交 |
 
