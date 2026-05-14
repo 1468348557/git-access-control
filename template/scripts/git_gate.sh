@@ -153,7 +153,30 @@ check_diff_size() {
   fi
 }
 
-# 4. 合并前基线校验
+# 4. 提交信息校验
+check_commit_messages() {
+  local source_branch="$1"
+  local target_branch="$2"
+
+  echo "检查提交信息: ${source_branch} -> ${target_branch}"
+
+  git fetch origin "${source_branch}" "${target_branch}"
+
+  local bad_commits
+  bad_commits="$(git log "origin/${target_branch}..origin/${source_branch}" --pretty=format:"%h %s" \
+    | grep -v "合并" || true)"
+
+  if [[ -n "${bad_commits}" ]]; then
+    fail "以下提交的 message 不包含「合并」关键字：
+${bad_commits}
+
+所有提交信息必须包含「合并」"
+  fi
+
+  pass "提交信息校验通过"
+}
+
+# 5. 合并前基线校验
 check_merge_base() {
   local source_branch="$1"
   local target_branch="$2"
@@ -214,6 +237,7 @@ main() {
 
     check_merge_direction "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
     check_diff_size "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
+    check_commit_messages "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
     check_merge_base "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
   else
     echo "当前不是 MR 流水线，仅执行分支命名校验"
