@@ -36,6 +36,7 @@ Git 门禁规则
 | FIX / REQ / PUB | `uat` 开头 / `hotfix` / `release` |
 | comp | `uat` 开头 / `hotfix` / `release` |
 | feature | `uat` 开头 / `hotfix` / `release` |
+| master | 任意分支 |
 | hotfix | `master` |
 | release | `master` |
 
@@ -69,6 +70,7 @@ Git 门禁规则
 
 | 合并方向 | 是否检查 | 说明 |
 |---|---|---|
+| master → * | 跳过 | master 是基线，不检查 |
 | FIX/REQ/PUB/comp/feature → uat* | 跳过 | 基于 master，与 uat 无继承关系 |
 | FIX/REQ/PUB/comp/feature → hotfix/release | 跳过 | 基于 master，与 hotfix/release 无继承关系 |
 | hotfix → master | 检查 | 源分支必须包含 master 最新提交 |

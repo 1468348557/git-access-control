@@ -8,7 +8,7 @@ PIPELINE_SOURCE="${CI_PIPELINE_SOURCE:-}"
 MR_SOURCE_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 MR_TARGET_BRANCH="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
 
-BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature)'
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature|master)'
 BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?$'
 HOTFIX_BRANCH_PATTERN='^hotfix-[0-9]{8}$'
 RELEASE_BRANCH_PATTERN='^release-[0-9]{8}$'
@@ -126,6 +126,11 @@ check_merge_direction() {
     fi
   fi
 
+  if [[ "$source_branch" == "master" ]]; then
+    pass "master 合入任意分支，合并方向校验通过"
+    return 0
+  fi
+
   fail "未匹配到合法的源分支类型: ${source_branch}"
 }
 
@@ -180,6 +185,12 @@ ${bad_commits}
 check_merge_base() {
   local source_branch="$1"
   local target_branch="$2"
+
+  # master 合入任意分支时不检查基线
+  if [[ "$source_branch" == "master" ]]; then
+    echo "master -> ${target_branch}，跳过基线校验"
+    return 0
+  fi
 
   # 业务/comp/feature 分支从 master 拉出，合到 uat*/hotfix/release 时不检查基线
   if is_uat_style_source "${source_branch}"; then
