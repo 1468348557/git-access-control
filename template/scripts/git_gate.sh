@@ -8,7 +8,7 @@ PIPELINE_SOURCE="${CI_PIPELINE_SOURCE:-}"
 MR_SOURCE_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 MR_TARGET_BRANCH="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
 
-BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature/)'
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature)'
 BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?$'
 HOTFIX_BRANCH_PATTERN='^hotfix-[0-9]{8}$'
 RELEASE_BRANCH_PATTERN='^release-[0-9]{8}$'
