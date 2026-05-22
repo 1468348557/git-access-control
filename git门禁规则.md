@@ -24,6 +24,9 @@ Git 门禁规则
 | release | `^release-[0-9]{8}$` | `release-20260513` |
 | comp | `^comp` | `comp*`（任意内容） |
 | feature | `^feature` | `feature*`（任意内容） |
+| master | `^master$` | `master` |
+| uat | `^uat` | `uat*`（任意内容） |
+| sit | `^sit` | `sit*`（任意内容） |
 
 ---
 
@@ -33,9 +36,9 @@ Git 门禁规则
 
 | 源分支 | 目标分支 |
 |---|---|
-| FIX / REQ / PUB | `uat` 开头 / `hotfix` / `release` |
-| comp | `uat` 开头 / `hotfix` / `release` |
-| feature | `uat` 开头 / `hotfix` / `release` |
+| FIX / REQ / PUB | `uat` 开头 / `sit` 开头 / `hotfix` / `release` |
+| comp | `uat` 开头 / `sit` 开头 / `hotfix` / `release` |
+| feature | `uat` 开头 / `sit` 开头 / `hotfix` / `release` |
 | master | 任意分支 |
 | hotfix | `master` |
 | release | `master` |
@@ -53,14 +56,13 @@ Git 门禁规则
 
 ---
 
-## 4. 提交信息校验（仅 MR）
-
-检查源分支中的所有提交 message 是否包含「合并」关键字：
+## 4. MR 标题校验（仅 MR）
 
 | 条件 | 结果 |
 |---|---|
-| 所有提交均包含「合并」 | 通过 |
-| 存在不含「合并」的提交 | 失败，列出问题提交 |
+| MR 标题包含「合并」 | 通过 |
+| hotfix/release → master 且 MR 描述包含「投产追板」 | 通过（豁免「合并」关键字） |
+| 其他情况 | 失败 |
 
 ---
 
@@ -72,16 +74,22 @@ Git 门禁规则
 |---|---|---|
 | master → * | 跳过 | master 是基线，不检查 |
 | FIX/REQ/PUB/comp/feature → uat* | 跳过 | 基于 master，与 uat 无继承关系 |
+| FIX/REQ/PUB/comp/feature → sit* | 跳过 | 基于 master，与 sit 无继承关系 |
 | FIX/REQ/PUB/comp/feature → hotfix/release | 跳过 | 基于 master，与 hotfix/release 无继承关系 |
 | hotfix → master | 检查 | 源分支必须包含 master 最新提交 |
 | release → master | 检查 | 源分支必须包含 master 最新提交 |
 
 ---
 
-## 6. 人工审批（仅 MR）
+## 6. 自动合并 & 人工审批（仅 MR）
 
-流水线 Stage 2 为 `when: manual` 手动审批任务：
+合并 API 调用时机根据 `approval_status`：
 
-- 读取 Stage 1 生成的 `approval_status` 文件
-- `PASS`：无需审批，点击即过
-- `NEEDS_APPROVAL:<行数>`：审批人确认变更后通过
+- `PASS`（变更 ≤100 行）→ Stage 1 `git_gate.sh` 直接调用 GitLab API 自动合并，不依赖 artifacts
+- `NEEDS_APPROVAL:<行数>`（变更 >100 行）→ Stage 2 `approval.sh` 手动触发后调用 API 合并
+
+### 前置条件
+
+项目需配置 CI/CD 变量 `GITLAB_PRIVATE_TOKEN`（Personal Access Token，权限 `api`）。
+
+`approval.sh` 独立计算变更行数，不依赖 gate 阶段的 artifacts，兼容 artifacts 不可用的环境。

@@ -7,14 +7,16 @@ BRANCH_NAME="${CI_COMMIT_REF_NAME:-}"
 PIPELINE_SOURCE="${CI_PIPELINE_SOURCE:-}"
 MR_SOURCE_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 MR_TARGET_BRANCH="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
+MR_TITLE="${CI_MERGE_REQUEST_TITLE:-}"
 
-BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature|master)'
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature|master|uat|sit)'
 BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?$'
 HOTFIX_BRANCH_PATTERN='^hotfix-[0-9]{8}$'
 RELEASE_BRANCH_PATTERN='^release-[0-9]{8}$'
 COMP_BRANCH_PATTERN='^comp'
 FEATURE_BRANCH_PATTERN='^feature'
 UAT_TARGET_PATTERN='^uat'
+SIT_TARGET_PATTERN='^sit'
 
 fail() {
   echo ""
@@ -30,7 +32,13 @@ pass() {
 check_date_valid() {
   local date_part="$1"
 
-  if ! formatted_date=$(date -d "$date_part" +"%Y%m%d" 2>/dev/null); then
+  local formatted_date
+  # macOS (BSD) 用 -j -f，Linux (GNU) 用 -d
+  if formatted_date=$(date -j -f "%Y%m%d" "$date_part" +"%Y%m%d" 2>/dev/null); then
+    :
+  elif formatted_date=$(date -d "$date_part" +"%Y%m%d" 2>/dev/null); then
+    :
+  else
     return 1
   fi
 
@@ -91,6 +99,7 @@ check_merge_direction() {
 
   if is_uat_style_source "${source_branch}"; then
     if [[ "$target_branch" =~ $UAT_TARGET_PATTERN ]] || \
+       [[ "$target_branch" =~ $SIT_TARGET_PATTERN ]] || \
        [[ "$target_branch" =~ $HOTFIX_BRANCH_PATTERN ]] || \
        [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
       pass "合并方向校验通过"
@@ -99,6 +108,7 @@ check_merge_direction() {
       fail "不允许的合并方向: ${source_branch} -> ${target_branch}
 允许方向:
   - FIX/REQ/PUB/comp/feature -> uat*
+  - FIX/REQ/PUB/comp/feature -> sit*
   - FIX/REQ/PUB/comp/feature -> hotfix
   - FIX/REQ/PUB/comp/feature -> release"
     fi
@@ -158,27 +168,25 @@ check_diff_size() {
   fi
 }
 
-# 4. 提交信息校验
-check_commit_messages() {
-  local source_branch="$1"
-  local target_branch="$2"
+# 4. MR 标题校验
+check_mr_title() {
+  echo "检查 MR 标题: ${MR_TITLE}"
 
-  echo "检查提交信息: ${source_branch} -> ${target_branch}"
-
-  git fetch origin "${source_branch}" "${target_branch}"
-
-  local bad_commits
-  bad_commits="$(git log "origin/${target_branch}..origin/${source_branch}" --pretty=format:"%h %s" \
-    | grep -v "合并" || true)"
-
-  if [[ -n "${bad_commits}" ]]; then
-    fail "以下提交的 message 不包含「合并」关键字：
-${bad_commits}
-
-所有提交信息必须包含「合并」"
+  if [[ "$MR_TITLE" == *合并* ]]; then
+    pass "MR 标题校验通过"
+    return 0
   fi
 
-  pass "提交信息校验通过"
+  # hotfix/release → master 且描述含「投产追板」豁免「合并」关键字
+  local mr_description="${CI_MERGE_REQUEST_DESCRIPTION:-}"
+  if [[ "$MR_SOURCE_BRANCH" =~ ^(hotfix|release)-[0-9]{8}$ ]] && \
+     [[ "$MR_TARGET_BRANCH" == "master" ]] && \
+     [[ "$mr_description" == *投产追板* ]]; then
+    pass "MR 标题校验通过（投产追板豁免）"
+    return 0
+  fi
+
+  fail "MR 标题不包含「合并」关键字，当前标题: ${MR_TITLE}"
 }
 
 # 5. 合并前基线校验
@@ -192,9 +200,10 @@ check_merge_base() {
     return 0
   fi
 
-  # 业务/comp/feature 分支从 master 拉出，合到 uat*/hotfix/release 时不检查基线
+  # 业务/comp/feature 分支从 master 拉出，合到 uat*/sit*/hotfix/release 时不检查基线
   if is_uat_style_source "${source_branch}"; then
     if [[ "$target_branch" =~ $UAT_TARGET_PATTERN ]] || \
+       [[ "$target_branch" =~ $SIT_TARGET_PATTERN ]] || \
        [[ "$target_branch" =~ $HOTFIX_BRANCH_PATTERN ]] || \
        [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
       echo "基于 master 的分支 -> ${target_branch}，跳过基线校验"
@@ -248,13 +257,34 @@ main() {
 
     check_merge_direction "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
     check_diff_size "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
-    check_commit_messages "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
+    check_mr_title
     check_merge_base "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
+
+    # PASS 情况下直接调 API 合并（不依赖 artifacts）
+    if [[ -f approval_status ]] && [[ "$(cat approval_status)" == "PASS" ]]; then
+      echo "门禁通过，执行自动合并..."
+      API_URL="${CI_API_V4_URL:-${CI_SERVER_URL}/api/v4}"
+      TOKEN="${GITLAB_PRIVATE_TOKEN}"
+      if [[ -n "${TOKEN:-}" ]]; then
+        RESP=$(curl -s --header "PRIVATE-TOKEN: ${TOKEN}" \
+          -X PUT "${API_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/merge" \
+          -H "Content-Type: application/json" \
+          -d '{"merge_when_pipeline_succeeds": true}') || true
+        echo "API 响应: ${RESP}"
+        if echo "${RESP}" | grep -q '"state":"merged"' || echo "${RESP}" | grep -q '"merge_when_pipeline_succeeds":true'; then
+          echo "合并请求已提交"
+        else
+          echo "[WARN] 合并 API 调用失败，响应见上方"
+        fi
+      else
+        echo "[WARN] 未配置 GITLAB_PRIVATE_TOKEN，跳过自动合并"
+      fi
+    fi
   else
     echo "当前不是 MR 流水线，仅执行分支命名校验"
   fi
 
-  echo "========== Git 门禁通过 =========="
+  echo "========== Git 门禁结束 =========="
 }
 
 main "$@"
