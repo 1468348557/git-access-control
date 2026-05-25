@@ -115,13 +115,15 @@ check_merge_direction() {
   fi
 
   if [[ "$source_branch" =~ $HOTFIX_BRANCH_PATTERN ]]; then
-    if [[ "$target_branch" == "master" ]]; then
+    if [[ "$target_branch" == "master" ]] || \
+       [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
       pass "hotfix 分支合并方向校验通过"
       return 0
     else
       fail "不允许的合并方向: ${source_branch} -> ${target_branch}
 允许方向:
-  - hotfix -> master"
+  - hotfix -> master
+  - hotfix -> release"
     fi
   fi
 
