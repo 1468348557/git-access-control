@@ -26,27 +26,7 @@ if [[ "${total_lines}" -le 100 ]]; then
   exit 0
 fi
 
-echo "MR 变更 ${total_lines} 行（超过100行阈值）"
-echo "人工审批已确认，执行合并"
-
-if [[ -z "${TOKEN:-}" ]]; then
-  echo "未配置 GITLAB_PRIVATE_TOKEN，无法合并"
-  exit 1
-fi
-
-echo "调用合并 API: PUT ${API_URL}/projects/${PROJECT_ID}/merge_requests/${MR_IID}/merge"
-
-RESP=$(curl -sf --header "PRIVATE-TOKEN: ${TOKEN}" \
-  -X PUT "${API_URL}/projects/${PROJECT_ID}/merge_requests/${MR_IID}/merge" \
-  -H "Content-Type: application/json" \
-  -d '{"merge_when_pipeline_succeeds": true}') && rc=$? || rc=$?
-
-echo "API 响应: ${RESP}"
-
-if [[ "${rc}" -eq 0 ]]; then
-  echo "合并请求已提交"
-else
-  echo "[WARN] 合并 API 调用失败，请检查上方响应"
-fi
+echo "MR 变更 ${total_lines} 行（超过100行阈值），人工审批已通过"
+echo "请管理员在 GitLab 上点击 Merge 按钮完成合并"
 
 echo "========== 审批完成 =========="

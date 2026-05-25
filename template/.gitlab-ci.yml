@@ -4,8 +4,9 @@ stages:
 
 variables:
   GIT_DEPTH: "0"
+  GATE_REPO: "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.spdb.com/zh-1087/hobo-git-gate.git"
 
-git_gate:
+gate:
   stage: gate
   tags:
     - shell
@@ -14,8 +15,9 @@ git_gate:
     - echo "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
     - echo "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
     - echo "CI_MERGE_REQUEST_TARGET_BRANCH_NAME=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-    - chmod +x scripts/git_gate.sh
-    - ./scripts/git_gate.sh
+    - git clone --depth 1 ${GATE_REPO} /tmp/gate 2>/dev/null || git clone --depth 1 "https://gitlab.spdb.com/zh-1087/hobo-git-gate.git" /tmp/gate
+    - chmod +x /tmp/gate/scripts/git_gate.sh
+    - /tmp/gate/scripts/git_gate.sh
   artifacts:
     paths:
       - approval_status
@@ -31,9 +33,9 @@ approval:
   needs:
     - git_gate
   script:
-    - chmod +x scripts/approval.sh
-    - ./scripts/approval.sh
+    - git clone --depth 1 ${GATE_REPO} /tmp/gate 2>/dev/null || git clone --depth 1 "https://gitlab.spdb.com/zh-1087/hobo-git-gate.git" /tmp/gate
+    - chmod +x /tmp/gate/scripts/approval.sh
+    - /tmp/gate/scripts/approval.sh
   when: manual
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-

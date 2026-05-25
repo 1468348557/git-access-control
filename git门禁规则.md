@@ -2,6 +2,18 @@ Git 门禁规则
 
 ---
 
+## 部署方式
+
+门禁代码集中维护在 `zh-1087/hobo-git-gate`，业务项目通过 `ci_config_path` 指向该仓库，无需在每个业务项目中放置门禁文件。
+
+```
+业务项目 → Settings → CI/CD → ci_config_path: .gitlab-ci.yml@zh-1087/hobo-git-gate@main
+```
+
+CI 运行时自动 clone 门禁仓库脚本执行。详细部署步骤见 [部署指南](docs/部署指南.md)。
+
+---
+
 ## 触发方式
 
 | 事件 | 触发检查 |
@@ -83,13 +95,15 @@ Git 门禁规则
 
 ## 6. 自动合并 & 人工审批（仅 MR）
 
-合并 API 调用时机根据 `approval_status`：
+根据变更行数决定合并方式：
 
-- `PASS`（变更 ≤100 行）→ Stage 1 `git_gate.sh` 直接调用 GitLab API 自动合并，不依赖 artifacts
-- `NEEDS_APPROVAL:<行数>`（变更 >100 行）→ Stage 2 `approval.sh` 手动触发后调用 API 合并
+| 条件 | 行为 |
+|---|---|
+| ≤ 100 行 | `git_gate.sh` 直接调用 GitLab API 自动合并 |
+| > 100 行 | `approval.sh` 手动触发，审批通过后由管理员在 GitLab 手动点击 Merge |
 
 ### 前置条件
 
-项目需配置 CI/CD 变量 `GITLAB_PRIVATE_TOKEN`（Personal Access Token，权限 `api`）。
+项目需配置 CI/CD 变量 `GITLAB_PRIVATE_TOKEN`（Personal Access Token，权限 `api`），用于 ≤100 行的自动合并。
 
 `approval.sh` 独立计算变更行数，不依赖 gate 阶段的 artifacts，兼容 artifacts 不可用的环境。
