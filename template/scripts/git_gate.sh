@@ -104,13 +104,20 @@ check_merge_direction() {
        [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
       pass "合并方向校验通过"
       return 0
-    else
-      fail "不允许的合并方向: ${source_branch} -> ${target_branch}
+    fi
+    # FIX/REQ/PUB 之间可以互相合并
+    if [[ "$source_branch" =~ $BUSINESS_BRANCH_PATTERN ]] && \
+       [[ "$target_branch" =~ $BUSINESS_BRANCH_PATTERN ]]; then
+      pass "合并方向校验通过"
+      return 0
+    fi
+    fail "不允许的合并方向: ${source_branch} -> ${target_branch}
 允许方向:
   - FIX/REQ/PUB/comp/feature -> uat*
   - FIX/REQ/PUB/comp/feature -> sit*
   - FIX/REQ/PUB/comp/feature -> hotfix
-  - FIX/REQ/PUB/comp/feature -> release"
+  - FIX/REQ/PUB/comp/feature -> release
+  - FIX/REQ/PUB -> FIX/REQ/PUB"
     fi
   fi
 
