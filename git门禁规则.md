@@ -84,7 +84,7 @@ Git 门禁规则
 | FIX/REQ/PUB/comp/feature → hotfix/release | 跳过 | 基于 master，与 hotfix/release 无继承关系 |
 | FIX/REQ/PUB → FIX/REQ/PUB | 检查 | 源分支必须包含目标分支最新提交 |
 | hotfix → master | 检查 | 源分支必须包含 master 最新提交 |
-| hotfix → release | 检查 | 源分支必须包含 release 最新提交 |
+| hotfix → release | 跳过 | 均从 master 拉出，无继承关系 |
 | release → master | 检查 | 源分支必须包含 master 最新提交 |
 
 ---

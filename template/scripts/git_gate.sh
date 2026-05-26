@@ -222,6 +222,13 @@ check_merge_base() {
     fi
   fi
 
+  # hotfix/release 之间互相合并，均从 master 拉出，不检查基线
+  if [[ "$source_branch" =~ $HOTFIX_BRANCH_PATTERN ]] && \
+     [[ "$target_branch" =~ $RELEASE_BRANCH_PATTERN ]]; then
+    echo "hotfix -> release，跳过基线校验"
+    return 0
+  fi
+
   echo "检查基线同步: ${source_branch} 是否包含 ${target_branch} 最新提交"
 
   git fetch origin "${target_branch}"
