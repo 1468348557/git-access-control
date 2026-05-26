@@ -119,7 +119,6 @@ check_merge_direction() {
   - FIX/REQ/PUB/comp/feature -> release
   - FIX/REQ/PUB -> FIX/REQ/PUB"
     fi
-  fi
 
   if [[ "$source_branch" =~ $HOTFIX_BRANCH_PATTERN ]]; then
     if [[ "$target_branch" == "master" ]] || \
@@ -160,7 +159,7 @@ check_diff_size() {
 
   echo "检查 MR 变更行数: ${source_branch} -> ${target_branch}"
 
-  git fetch origin "${source_branch}" "${target_branch}"
+  git fetch origin "+refs/heads/${source_branch}:refs/remotes/origin/${source_branch}" "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}"
 
   local total_lines
   total_lines="$(git diff --numstat "origin/${target_branch}...origin/${source_branch}" \
@@ -222,7 +221,7 @@ check_merge_base() {
 
   echo "检查基线同步: ${source_branch} 是否包含 ${target_branch} 最新提交"
 
-  git fetch origin "${source_branch}" "${target_branch}"
+  git fetch origin "+refs/heads/${source_branch}:refs/remotes/origin/${source_branch}" "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}"
 
   local source_ref="origin/${source_branch}"
   local target_ref="origin/${target_branch}"

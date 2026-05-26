@@ -5,8 +5,11 @@ stages:
 variables:
   GIT_DEPTH: "0"
 
-.clone_gate: &clone_gate
-  - git clone --depth 1 "http://${GATE_DEPLOY_USER}:${GATE_DEPLOY_PASS}@gitlab.spdb.com/zh-1087/hobo-git-gate.git" /tmp/gate
+.download_scripts: &download_scripts
+  - mkdir -p /tmp/gate/scripts
+  - curl -sS -o /tmp/gate/scripts/git_gate.sh "${GATE_URL}/scripts/git_gate.sh"
+  - curl -sS -o /tmp/gate/scripts/approval.sh "${GATE_URL}/scripts/approval.sh"
+  - chmod +x /tmp/gate/scripts/git_gate.sh /tmp/gate/scripts/approval.sh
 
 gate:
   stage: gate
@@ -17,8 +20,7 @@ gate:
     - echo "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
     - echo "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
     - echo "CI_MERGE_REQUEST_TARGET_BRANCH_NAME=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-    - *clone_gate
-    - chmod +x /tmp/gate/scripts/git_gate.sh
+    - *download_scripts
     - /tmp/gate/scripts/git_gate.sh
   artifacts:
     paths:
@@ -33,10 +35,9 @@ approval:
   tags:
     - shell
   needs:
-    - git_gate
+    - gate
   script:
-    - *clone_gate
-    - chmod +x /tmp/gate/scripts/approval.sh
+    - *download_scripts
     - /tmp/gate/scripts/approval.sh
   when: manual
   rules:
