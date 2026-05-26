@@ -159,10 +159,13 @@ check_diff_size() {
 
   echo "检查 MR 变更行数: ${source_branch} -> ${target_branch}"
 
-  git fetch origin "+refs/heads/${source_branch}:refs/remotes/origin/${source_branch}" "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}"
+  git fetch origin "${target_branch}"
+  local target_sha; target_sha="$(git rev-parse FETCH_HEAD)"
+  git fetch origin "${source_branch}"
+  local source_sha; source_sha="$(git rev-parse FETCH_HEAD)"
 
   local total_lines
-  total_lines="$(git diff --numstat "origin/${target_branch}...origin/${source_branch}" \
+  total_lines="$(git diff --numstat "${target_sha}...${source_sha}" \
     | awk '{ added+=$1; deleted+=$2 } END { print (added+deleted) }')"
 
   echo "变更总行数: ${total_lines}"
@@ -221,19 +224,15 @@ check_merge_base() {
 
   echo "检查基线同步: ${source_branch} 是否包含 ${target_branch} 最新提交"
 
-  git fetch origin "+refs/heads/${source_branch}:refs/remotes/origin/${source_branch}" "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}"
+  git fetch origin "${target_branch}"
+  local target_commit; target_commit="$(git rev-parse FETCH_HEAD)"
+  git fetch origin "${source_branch}"
+  local source_commit; source_commit="$(git rev-parse FETCH_HEAD)"
 
-  local source_ref="origin/${source_branch}"
-  local target_ref="origin/${target_branch}"
-
-  local target_commit
-  target_commit="$(git rev-parse "${target_ref}")"
-
-  echo "source_ref=${source_ref}"
-  echo "target_ref=${target_ref}"
   echo "target_commit=${target_commit}"
+  echo "source_commit=${source_commit}"
 
-  if git merge-base --is-ancestor "${target_commit}" "${source_ref}"; then
+  if git merge-base --is-ancestor "${target_commit}" "${source_commit}"; then
     pass "基线校验通过，源分支已包含目标分支最新提交"
   else
     fail "基线校验失败：源分支未包含目标分支最新提交

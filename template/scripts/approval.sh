@@ -12,8 +12,11 @@ TOKEN="${GITLAB_PRIVATE_TOKEN}"
 
 # 计算变更行数（不依赖 gate 阶段的 artifacts）
 if [[ -n "${SOURCE_BRANCH}" ]] && [[ -n "${TARGET_BRANCH}" ]]; then
-  git fetch origin "+refs/heads/${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}" "+refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" 2>/dev/null
-  total_lines=$(git diff --numstat "origin/${TARGET_BRANCH}...origin/${SOURCE_BRANCH}" 2>/dev/null \
+  git fetch origin "${TARGET_BRANCH}" 2>/dev/null
+  target_sha="$(git rev-parse FETCH_HEAD)"
+  git fetch origin "${SOURCE_BRANCH}" 2>/dev/null
+  source_sha="$(git rev-parse FETCH_HEAD)"
+  total_lines=$(git diff --numstat "${target_sha}...${source_sha}" 2>/dev/null \
     | awk '{ added+=$1; deleted+=$2 } END { print (added+deleted+0) }')
   echo "变更总行数: ${total_lines}"
 else
