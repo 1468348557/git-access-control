@@ -287,7 +287,7 @@ main() {
       API_URL="${CI_API_V4_URL:-${CI_SERVER_URL}/api/v4}"
       TOKEN="${GITLAB_PRIVATE_TOKEN}"
       if [[ -n "${TOKEN:-}" ]]; then
-        local max_retry=3
+        local max_retry=5
         local retry=0
         local merged=0
         while [[ $retry -lt $max_retry ]]; do

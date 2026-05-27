@@ -6,6 +6,7 @@ variables:
   GIT_DEPTH: "0"
 
 .download_scripts: &download_scripts
+  - rm -rf /tmp/gate/scripts
   - mkdir -p /tmp/gate/scripts
   - curl -sS -o /tmp/gate/scripts/git_gate.sh "${GATE_URL}/scripts/git_gate.sh"
   - curl -sS -o /tmp/gate/scripts/approval.sh "${GATE_URL}/scripts/approval.sh"

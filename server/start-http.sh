@@ -9,7 +9,7 @@ PORT=8080
 
 if [[ ! -d "${SERVER_ROOT}" ]]; then
   echo "错误: 门禁仓库不存在 ${SERVER_ROOT}"
-  echo "请先执行: git clone git@gitlab.spdb.com:zh-1087/hobo-git-gate.git ${SERVER_ROOT}"
+  echo "请先执行: git clone http://\${GATE_DEPLOY_USER}:\${GATE_DEPLOY_PASS}@gitlab.spdb.com/zh-1087/hobo-git-gate.git ${SERVER_ROOT}"
   exit 1
 fi
 
