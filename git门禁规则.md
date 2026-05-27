@@ -23,9 +23,9 @@ Git 门禁规则
 
 | 类型 | 正则 | 示例 |
 |---|---|---|
-| FIX（缺陷修复） | `^FIX-[0-9]{8}-[0-9]{4}(-.+)?$` | `FIX-20260513-0001` 或 `FIX-20260513-0001-修复描述` |
-| REQ（需求） | `^REQ-[0-9]{8}-[0-9]{4}(-.+)?$` | `REQ-20260513-0001` 或 `REQ-20260513-0001-需求描述` |
-| PUB（公共） | `^PUB-[0-9]{8}-[0-9]{4}(-.+)?$` | `PUB-20260513-0001` 或 `PUB-20260513-0001-发布描述` |
+| FIX（缺陷修复） | `^FIX-[0-9]{8}-[0-9]{4}([-_].+)?$` | `FIX-20260513-0001` 或 `FIX-20260513-0001-修复描述` 或 `FIX-20260513-0001_uat` |
+| REQ（需求） | `^REQ-[0-9]{8}-[0-9]{4}([-_].+)?$` | `REQ-20260513-0001` 或 `REQ-20260513-0001-需求描述` 或 `REQ-20260513-0001_uat` |
+| PUB（公共） | `^PUB-[0-9]{8}-[0-9]{4}([-_].+)?$` | `PUB-20260513-0001` 或 `PUB-20260513-0001-发布描述` 或 `PUB-20260513-0001_uat` |
 | hotfix | `^hotfix-[0-9]{8}$` | `hotfix-20260513` |
 | release | `^release-[0-9]{8}$` | `release-20260513` |
 | comp | `^comp` | `comp*`（任意内容） |
@@ -82,7 +82,7 @@ Git 门禁规则
 | FIX/REQ/PUB/comp/feature → uat* | 跳过 | 基于 master，与 uat 无继承关系 |
 | FIX/REQ/PUB/comp/feature → sit* | 跳过 | 基于 master，与 sit 无继承关系 |
 | FIX/REQ/PUB/comp/feature → hotfix/release | 跳过 | 基于 master，与 hotfix/release 无继承关系 |
-| FIX/REQ/PUB → FIX/REQ/PUB | 检查 | 源分支必须包含目标分支最新提交 |
+| FIX/REQ/PUB → FIX/REQ/PUB | 跳过 | 均从 master 拉出，无继承关系 |
 | hotfix → master | 检查 | 源分支必须包含 master 最新提交 |
 | hotfix → release | 跳过 | 均从 master 拉出，无继承关系 |
 | release → master | 检查 | 源分支必须包含 master 最新提交 |

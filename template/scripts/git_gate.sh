@@ -9,8 +9,8 @@ MR_SOURCE_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 MR_TARGET_BRANCH="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
 MR_TITLE="${CI_MERGE_REQUEST_TITLE:-}"
 
-BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?|(hotfix|release)-[0-9]{8}|comp|feature|master|uat|sit)'
-BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-.+)?$'
+BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}([-_].+)?|(hotfix|release)-[0-9]{8}|comp|feature|master|uat|sit)'
+BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}([-_].+)?$'
 HOTFIX_BRANCH_PATTERN='^hotfix-[0-9]{8}$'
 RELEASE_BRANCH_PATTERN='^release-[0-9]{8}$'
 COMP_BRANCH_PATTERN='^comp'
@@ -54,9 +54,9 @@ check_branch_name() {
   if [[ ! "$branch" =~ $BRANCH_PATTERN ]]; then
     fail "分支命名不符合规范: $branch
 允许格式:
-  1. FIX-YYYYMMDD-NNNN[-额外名称]
-  2. REQ-YYYYMMDD-NNNN[-额外名称]
-  3. PUB-YYYYMMDD-NNNN[-额外名称]
+  1. FIX-YYYYMMDD-NNNN[-_额外名称]
+  2. REQ-YYYYMMDD-NNNN[-_额外名称]
+  3. PUB-YYYYMMDD-NNNN[-_额外名称]
   4. hotfix-YYYYMMDD
   5. release-YYYYMMDD
   6. comp*
@@ -229,6 +229,13 @@ check_merge_base() {
     return 0
   fi
 
+  # FIX/REQ/PUB 之间互相合并，均从 master 拉出，不检查基线
+  if [[ "$source_branch" =~ $BUSINESS_BRANCH_PATTERN ]] && \
+     [[ "$target_branch" =~ $BUSINESS_BRANCH_PATTERN ]]; then
+    echo "业务分支间合并，跳过基线校验"
+    return 0
+  fi
+
   echo "检查基线同步: ${source_branch} 是否包含 ${target_branch} 最新提交"
 
   git fetch origin "${target_branch}"
@@ -280,15 +287,29 @@ main() {
       API_URL="${CI_API_V4_URL:-${CI_SERVER_URL}/api/v4}"
       TOKEN="${GITLAB_PRIVATE_TOKEN}"
       if [[ -n "${TOKEN:-}" ]]; then
-        RESP=$(curl -s --header "PRIVATE-TOKEN: ${TOKEN}" \
-          -X PUT "${API_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/merge" \
-          -H "Content-Type: application/json" \
-          -d '{"merge_when_pipeline_succeeds": true}') || true
-        echo "API 响应: ${RESP}"
-        if echo "${RESP}" | grep -q '"state":"merged"' || echo "${RESP}" | grep -q '"merge_when_pipeline_succeeds":true'; then
-          echo "合并请求已提交"
-        else
-          echo "[WARN] 合并 API 调用失败，响应见上方"
+        local max_retry=3
+        local retry=0
+        local merged=0
+        while [[ $retry -lt $max_retry ]]; do
+          retry=$((retry + 1))
+          echo "合并 API 请求 (第 ${retry}/${max_retry} 次)..."
+          RESP=$(curl -s --header "PRIVATE-TOKEN: ${TOKEN}" \
+            -X PUT "${API_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/merge" \
+            -H "Content-Type: application/json" \
+            -d '{"merge_when_pipeline_succeeds": true}') || true
+          echo "API 响应: ${RESP}"
+          if echo "${RESP}" | grep -q '"state":"merged"' || echo "${RESP}" | grep -q '"merge_when_pipeline_succeeds":true'; then
+            echo "合并请求已提交"
+            merged=1
+            break
+          fi
+          if [[ $retry -lt $max_retry ]]; then
+            echo "合并失败，2 秒后重试..."
+            sleep 2
+          fi
+        done
+        if [[ $merged -eq 0 ]]; then
+          echo "[WARN] 合并 API 调用失败（已重试 ${max_retry} 次），响应见上方"
         fi
       else
         echo "[WARN] 未配置 GITLAB_PRIVATE_TOKEN，跳过自动合并"
