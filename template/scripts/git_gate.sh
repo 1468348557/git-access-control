@@ -18,6 +18,31 @@ FEATURE_BRANCH_PATTERN='^feature'
 UAT_TARGET_PATTERN='^uat'
 SIT_TARGET_PATTERN='^sit'
 
+# 全局缓存：避免 check_diff_size 和 check_merge_base 重复 fetch
+_GIT_FETCHED_SOURCE=""
+_GIT_FETCHED_TARGET=""
+_GIT_SOURCE_SHA=""
+_GIT_TARGET_SHA=""
+DIFF_TOTAL_LINES=0
+
+# 带缓存的 fetch，同分支不重复拉取
+_fetch_branch_cached() {
+  local branch="$1"
+  local out_var="$2"
+
+  if [[ "$branch" == "${_GIT_FETCHED_SOURCE:-}" ]] && [[ -n "${_GIT_SOURCE_SHA:-}" ]]; then
+    printf -v "$out_var" "%s" "${_GIT_SOURCE_SHA}"
+    return 0
+  fi
+  if [[ "$branch" == "${_GIT_FETCHED_TARGET:-}" ]] && [[ -n "${_GIT_TARGET_SHA:-}" ]]; then
+    printf -v "$out_var" "%s" "${_GIT_TARGET_SHA}"
+    return 0
+  fi
+
+  git fetch origin "${branch}"
+  printf -v "$out_var" "%s" "$(git rev-parse FETCH_HEAD)"
+}
+
 fail() {
   echo ""
   echo "[FAIL] $1"
@@ -153,21 +178,24 @@ check_merge_direction() {
 }
 
 # 3. MR 变更行数校验
-DIFF_TOTAL_LINES=0
-
 check_diff_size() {
   local source_branch="$1"
   local target_branch="$2"
 
   echo "检查 MR 变更行数: ${source_branch} -> ${target_branch}"
 
-  git fetch origin "${target_branch}"
-  local target_sha; target_sha="$(git rev-parse FETCH_HEAD)"
-  git fetch origin "${source_branch}"
-  local source_sha; source_sha="$(git rev-parse FETCH_HEAD)"
+  _fetch_branch_cached "${target_branch}" "_GIT_TARGET_SHA"
+  _GIT_FETCHED_TARGET="${target_branch}"
+  _fetch_branch_cached "${source_branch}" "_GIT_SOURCE_SHA"
+  _GIT_FETCHED_SOURCE="${source_branch}"
 
-  DIFF_TOTAL_LINES="$(git diff --numstat "${target_sha}...${source_sha}" \
-    | awk '{ added+=$1; deleted+=$2 } END { print (added+deleted) }')"
+  # 二进制文件在 numstat 中显示为 "-  -"，awk 下转为 0
+  # 每个二进制文件计 999 行，避免触发 ≤100 行的自动合并
+  DIFF_TOTAL_LINES="$(git diff --numstat "${_GIT_TARGET_SHA}...${_GIT_SOURCE_SHA}" \
+    | awk '{
+      if ($1 == "-" && $2 == "-") { added+=999; deleted+=0 }
+      else { added+=$1; deleted+=$2 }
+    } END { print (added+deleted) }')"
 
   echo "变更总行数: ${DIFF_TOTAL_LINES}"
 
@@ -237,10 +265,14 @@ check_merge_base() {
 
   echo "检查基线同步: ${source_branch} 是否包含 ${target_branch} 最新提交"
 
-  git fetch origin "${target_branch}"
-  local target_commit; target_commit="$(git rev-parse FETCH_HEAD)"
-  git fetch origin "${source_branch}"
-  local source_commit; source_commit="$(git rev-parse FETCH_HEAD)"
+  # 复用 check_diff_size 已 fetch 的 SHA
+  local target_commit source_commit
+  _fetch_branch_cached "${target_branch}" "target_commit"
+  _GIT_FETCHED_TARGET="${target_branch}"
+  _GIT_TARGET_SHA="${target_commit}"
+  _fetch_branch_cached "${source_branch}" "source_commit"
+  _GIT_FETCHED_SOURCE="${source_branch}"
+  _GIT_SOURCE_SHA="${source_commit}"
 
   echo "target_commit=${target_commit}"
   echo "source_commit=${source_commit}"
