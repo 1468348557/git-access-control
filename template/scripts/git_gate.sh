@@ -153,6 +153,8 @@ check_merge_direction() {
 }
 
 # 3. MR 变更行数校验
+DIFF_TOTAL_LINES=0
+
 check_diff_size() {
   local source_branch="$1"
   local target_branch="$2"
@@ -164,17 +166,14 @@ check_diff_size() {
   git fetch origin "${source_branch}"
   local source_sha; source_sha="$(git rev-parse FETCH_HEAD)"
 
-  local total_lines
-  total_lines="$(git diff --numstat "${target_sha}...${source_sha}" \
+  DIFF_TOTAL_LINES="$(git diff --numstat "${target_sha}...${source_sha}" \
     | awk '{ added+=$1; deleted+=$2 } END { print (added+deleted) }')"
 
-  echo "变更总行数: ${total_lines}"
+  echo "变更总行数: ${DIFF_TOTAL_LINES}"
 
-  if [[ "${total_lines}" -gt 100 ]]; then
-    echo "NEEDS_APPROVAL:${total_lines}" > approval_status
-    echo "[WARN] MR 变更超过100行（${total_lines}行），需要人工审批"
+  if [[ "${DIFF_TOTAL_LINES}" -gt 100 ]]; then
+    echo "[WARN] MR 变更超过100行（${DIFF_TOTAL_LINES}行），需要人工审批"
   else
-    echo "PASS" > approval_status
     pass "MR 变更行数校验通过"
   fi
 }
@@ -281,8 +280,8 @@ main() {
     check_mr_title
     check_merge_base "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
 
-    # PASS 情况下直接调 API 合并（不依赖 artifacts）
-    if [[ -f approval_status ]] && [[ "$(cat approval_status)" == "PASS" ]]; then
+    # ≤100 行直接调 API 自动合并
+    if [[ "${DIFF_TOTAL_LINES}" -le 100 ]]; then
       echo "门禁通过，执行自动合并..."
       API_URL="${CI_API_V4_URL:-${CI_SERVER_URL}/api/v4}"
       TOKEN="${GITLAB_PRIVATE_TOKEN}"
