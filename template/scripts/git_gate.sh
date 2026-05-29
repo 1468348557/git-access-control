@@ -85,7 +85,8 @@ check_branch_name() {
   4. hotfix-YYYYMMDD
   5. release-YYYYMMDD
   6. comp*
-  7. feature*"
+  7. feature*
+  8. master / uat* / sit*"
   fi
 
   local date_part=""
@@ -296,6 +297,14 @@ main() {
 
   if [[ -z "${current_branch}" ]]; then
     fail "无法获取当前分支名"
+  fi
+
+  # 合入 sit 分支的 MR 不做任何校验，直接放行
+  if [[ "${PIPELINE_SOURCE}" == "merge_request_event" ]] && \
+     [[ "${MR_TARGET_BRANCH:-}" =~ $SIT_TARGET_PATTERN ]]; then
+    echo "目标分支为 sit*，跳过所有校验"
+    echo "========== Git 门禁结束 =========="
+    exit 0
   fi
 
   check_branch_name "${current_branch}"
