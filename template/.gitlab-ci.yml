@@ -4,12 +4,30 @@ stages:
 variables:
   GIT_DEPTH: "0"
 
-.download_scripts: &download_scripts
-  - rm -rf /tmp/gate/scripts
-  - mkdir -p /tmp/gate/scripts
-  - curl -sS -o /tmp/gate/scripts/git_gate.sh "${GATE_URL}/scripts/git_gate.sh"
-  - chmod +x /tmp/gate/scripts/git_gate.sh
+# 关键分支 MR（目标为 hotfix/release/master）使用专用 runner
+gate:critical:
+  stage: gate
+  tags:
+    - shell-critical
+  script:
+    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE"
+    - echo "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
+    - echo "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+    - echo "CI_MERGE_REQUEST_TARGET_BRANCH_NAME=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - rm -rf /tmp/gate/scripts
+    - mkdir -p /tmp/gate/scripts
+    - curl -sS -o /tmp/gate/scripts/git_gate.sh "${GATE_URL}/scripts/git_gate.sh"
+    - chmod +x /tmp/gate/scripts/git_gate.sh
+    - /tmp/gate/scripts/git_gate.sh
+  only:
+    refs:
+      - merge_requests
+    variables:
+      - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^hotfix-/
+      - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release-/
+      - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
 
+# 常规 Push + 非关键分支 MR
 gate:
   stage: gate
   tags:
@@ -19,8 +37,17 @@ gate:
     - echo "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
     - echo "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
     - echo "CI_MERGE_REQUEST_TARGET_BRANCH_NAME=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-    - *download_scripts
+    - rm -rf /tmp/gate/scripts
+    - mkdir -p /tmp/gate/scripts
+    - curl -sS -o /tmp/gate/scripts/git_gate.sh "${GATE_URL}/scripts/git_gate.sh"
+    - chmod +x /tmp/gate/scripts/git_gate.sh
     - /tmp/gate/scripts/git_gate.sh
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "push"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  only:
+    refs:
+      - pushes
+      - merge_requests
+  except:
+    variables:
+      - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^hotfix-/
+      - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release-/
+      - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"

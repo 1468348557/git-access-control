@@ -8,6 +8,19 @@
 
 ---
 
+## Runner 分组
+
+门禁根据 MR 目标分支使用不同的 Runner：
+
+| MR 目标分支 | Runner Tag | 说明 |
+| --- | --- | --- |
+| `hotfix*` / `release*` / `master` | `shell-critical` | 关键分支，专用 Runner 保障执行稳定性 |
+| 其他分支 | `shell` | 常规门禁 Runner |
+
+Push 事件统一使用 `shell` Runner。
+
+---
+
 ## 触发方式
 
 | 事件 | 触发检查 |
