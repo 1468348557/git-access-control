@@ -87,7 +87,7 @@ Push 事件统一使用 `shell` Runner。
 | 条件 | 结果 |
 | --- | --- |
 | MR 标题包含「合并」 | 通过 |
-| hotfix/release → master 且 MR 描述包含「投产追板」 | 通过（豁免「合并」关键字） |
+| hotfix/release → master 且 MR 标题包含「投产追版」 | 通过（豁免「合并」关键字） |
 | 其他情况 | 失败 |
 
 ---

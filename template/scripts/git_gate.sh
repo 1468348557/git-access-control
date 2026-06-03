@@ -216,12 +216,11 @@ check_mr_title() {
     return 0
   fi
 
-  # hotfix/release → master 且描述含「投产追板」豁免「合并」关键字
-  local mr_description="${CI_MERGE_REQUEST_DESCRIPTION:-}"
+  # hotfix/release → master 且标题含「投产追版」豁免「合并」关键字
   if [[ "$MR_SOURCE_BRANCH" =~ ^(hotfix|release)-[0-9]{8}$ ]] && \
      [[ "$MR_TARGET_BRANCH" == "master" ]] && \
-     [[ "$mr_description" == *投产追板* ]]; then
-    pass "MR 标题校验通过（投产追板豁免）"
+     [[ "$MR_TITLE" == *投产追版* ]]; then
+    pass "MR 标题校验通过（投产追版豁免）"
     return 0
   fi
 
