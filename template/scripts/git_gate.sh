@@ -326,24 +326,89 @@ main() {
       API_URL="${CI_API_V4_URL:-${CI_SERVER_URL}/api/v4}"
       TOKEN="${GITLAB_PRIVATE_TOKEN}"
       if [[ -n "${TOKEN:-}" ]]; then
-        local max_retry=5
+        local max_retry=10
         local retry=0
         local merged=0
         while [[ $retry -lt $max_retry ]]; do
           retry=$((retry + 1))
-          echo "合并 API 请求 (第 ${retry}/${max_retry} 次)..."
-          RESP=$(curl -s --header "PRIVATE-TOKEN: ${TOKEN}" \
-            -X PUT "${API_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/merge" \
-            -H "Content-Type: application/json" \
-            -d '{"merge_when_pipeline_succeeds": true}') || true
-          echo "API 响应: ${RESP}"
-          if echo "${RESP}" | grep -q '"state":"merged"' || echo "${RESP}" | grep -q '"merge_when_pipeline_succeeds":true'; then
-            echo "合并请求已提交"
+
+          # 先查询 MR 状态，merge_status=checking 时调用 PUT /merge 会 405
+          echo "查询 MR 状态 (第 ${retry}/${max_retry} 次)..."
+          MR_INFO=$(curl -s -w "\n%{http_code}" --header "PRIVATE-TOKEN: ${TOKEN}" \
+            "${API_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}") || true
+          http_code=$(echo "${MR_INFO}" | tail -n1)
+          mr_body=$(echo "${MR_INFO}" | sed '$d')
+
+          if [[ "$http_code" != "200" ]]; then
+            echo "MR 查询失败，HTTP ${http_code}，响应: ${mr_body}"
+            if [[ $retry -lt $max_retry ]]; then
+              echo "2 秒后重试..."
+              sleep 2
+            fi
+            continue
+          fi
+
+          merge_status=$(echo "${mr_body}" | grep -o '"merge_status":"[^"]*"' | cut -d'"' -f4)
+          mr_state=$(echo "${mr_body}" | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
+          echo "MR state=${mr_state}, merge_status=${merge_status}"
+
+          # 已合并则直接退出
+          if [[ "$mr_state" == "merged" ]]; then
+            echo "MR 已合并，无需重复操作"
             merged=1
             break
           fi
+
+          # 已关闭则退出
+          if [[ "$mr_state" == "closed" ]]; then
+            echo "[WARN] MR 已关闭，跳过自动合并"
+            break
+          fi
+
+          # merge_status 为 checking 时，等 GitLab 异步检查完成再试
+          if [[ "$merge_status" == "checking" ]]; then
+            echo "merge_status 为 checking，等待 GitLab 异步检查完成..."
+            sleep 3
+            continue
+          fi
+
+          # 不可合并时输出详细原因
+          if [[ "$merge_status" == "cannot_be_merged" ]]; then
+            detailed_merge_status=$(echo "${mr_body}" | grep -o '"detailed_merge_status":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+            echo "[WARN] MR 不可自动合并 (merge_status=cannot_be_merged, detailed=${detailed_merge_status})，跳过自动合并"
+            break
+          fi
+
+          # 可合并，调用合并 API（不传 merge_when_pipeline_succeeds，门禁已通过即表示本 pipeline 成功）
+          echo "发起合并请求..."
+          MERGE_RESP=$(curl -s -w "\n%{http_code}" --header "PRIVATE-TOKEN: ${TOKEN}" \
+            -X PUT "${API_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/merge") || true
+          http_code=$(echo "${MERGE_RESP}" | tail -n1)
+          resp_body=$(echo "${MERGE_RESP}" | sed '$d')
+          echo "HTTP ${http_code}, 响应: ${resp_body}"
+
+          if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]]; then
+            echo "合并成功"
+            merged=1
+            break
+          fi
+
+          # 405: MR 状态暂不可合并（可能在 checking 与 can_be_merged 之间），等一会重试
+          if [[ "$http_code" == "405" ]]; then
+            echo "收到 405，当前 merge_status=${merge_status}，3 秒后重试..."
+            sleep 3
+            continue
+          fi
+
+          # 409: MR 状态冲突（已有合并操作在进行）
+          if [[ "$http_code" == "409" ]]; then
+            echo "收到 409（状态冲突），2 秒后重试..."
+            sleep 2
+            continue
+          fi
+
           if [[ $retry -lt $max_retry ]]; then
-            echo "合并失败，2 秒后重试..."
+            echo "合并失败 (HTTP ${http_code})，2 秒后重试..."
             sleep 2
           fi
         done

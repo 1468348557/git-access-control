@@ -115,6 +115,29 @@ Push 事件统一使用 `shell` Runner。
 
 变更行数 ≤ 100 行时，`git_gate.sh` 直接调用 GitLab API 自动合并。> 100 行需管理员在 GitLab 手动点击 Merge。
 
+### 合并流程
+
+1. **查询 MR 状态**：先 GET 查询 MR 的 `merge_status` 和 `state`
+   - `state=merged`：已合并，跳过
+   - `state=closed`：已关闭，跳过
+   - `merge_status=checking`：GitLab 异步检查中，等 3 秒重试
+   - `merge_status=cannot_be_merged`：不可合并，打印 `detailed_merge_status` 后跳过
+   - `merge_status=can_be_merged`：进入步骤 2
+2. **发起合并**：`PUT /api/v4/projects/:id/merge_requests/:iid/merge`
+   - 不传 `merge_when_pipeline_succeeds`（避免 pipeline 自等待导致 405）
+   - 405/409 自动重试，最多 10 次
+3. **重试策略**：405（状态暂不可用）等 3 秒，409（冲突）等 2 秒，其他错误等 2 秒
+
+### 405 Method Not Allowed 说明
+
+触发 405 的常见原因：
+
+| 原因 | 说明 |
+| --- | --- |
+| `merge_status=checking` | GitLab 正在后台异步检查 MR 是否可合并，在此期间 PUT /merge 返回 405。脚本已通过步骤 1 先查询状态来规避 |
+| pipeline 自等待 | 传 `merge_when_pipeline_succeeds` 时，当前 pipeline 即 MR pipeline，形成循环等待，GitLab 返回 405。已移除此参数 |
+| MR 已合并 | 重复合并已合并的 MR 返回 405。脚本通过 step 1 检查 `state=merged` 规避 |
+
 ### 前置条件
 
 项目需配置 CI/CD 变量 `GITLAB_PRIVATE_TOKEN`（Personal Access Token，权限 `api`），用于自动合并。
