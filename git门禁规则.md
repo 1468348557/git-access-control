@@ -75,8 +75,8 @@ Push 事件统一使用 `shell` Runner。
 
 | 条件 | 结果 |
 | --- | --- |
-| ≤ 100 行 | 流水线通过，自动调用 GitLab API 合并 |
-| > 100 行 | 打印警告，需管理员在 GitLab 手动点击 Merge |
+| ≤ 150 行 | 流水线通过，自动调用 GitLab API 合并 |
+| > 150 行 | 打印警告，需管理员在 GitLab 手动点击 Merge |
 
 ---
 
@@ -113,7 +113,7 @@ Push 事件统一使用 `shell` Runner。
 
 ## 6. 自动合并（仅 MR）
 
-变更行数 ≤ 100 行时，`git_gate.sh` 直接调用 GitLab API 自动合并。> 100 行需管理员在 GitLab 手动点击 Merge。
+变更行数 ≤ 150 行时，`git_gate.sh` 直接调用 GitLab API 自动合并。> 150 行需管理员在 GitLab 手动点击 Merge。
 
 ### 合并流程
 
