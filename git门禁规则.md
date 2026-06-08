@@ -71,12 +71,12 @@ Push 事件统一使用 `shell` Runner。
 
 > 目标分支为 `sit*` 的 MR 跳过所有校验，直接放行（含此项）。
 
-计算源分支相对于目标分支的变更行数（新增 + 删除）：
+计算源分支相对于目标分支的变更行数（新增 + 删除），阈值由脚本顶部 `AUTO_MERGE_MAX_LINES` 变量控制：
 
 | 条件 | 结果 |
 | --- | --- |
-| ≤ 150 行 | 流水线通过，自动调用 GitLab API 合并 |
-| > 150 行 | 打印警告，需管理员在 GitLab 手动点击 Merge |
+| ≤ 阈值 | 流水线通过，自动调用 GitLab API 合并 |
+| > 阈值 | 打印警告，需管理员在 GitLab 手动点击 Merge |
 
 ---
 
@@ -113,7 +113,7 @@ Push 事件统一使用 `shell` Runner。
 
 ## 6. 自动合并（仅 MR）
 
-变更行数 ≤ 150 行时，`git_gate.sh` 直接调用 GitLab API 自动合并。> 150 行需管理员在 GitLab 手动点击 Merge。
+变更行数不超过 `AUTO_MERGE_MAX_LINES` 阈值时，`git_gate.sh` 直接调用 GitLab API 自动合并。超过阈值需管理员在 GitLab 手动点击 Merge。
 
 ### 合并流程
 

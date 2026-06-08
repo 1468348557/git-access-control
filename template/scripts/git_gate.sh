@@ -9,6 +9,11 @@ MR_SOURCE_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 MR_TARGET_BRANCH="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}"
 MR_TITLE="${CI_MERGE_REQUEST_TITLE:-}"
 
+# ===== 可自定义配置 =====
+# 自动合并行数阈值（新增+删除），超过此行数需人工审批
+AUTO_MERGE_MAX_LINES=150
+# =======================
+
 BRANCH_PATTERN='^((FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}([-_].+)?|(hotfix|release)-[0-9]{8}|comp|feature|master|uat|sit)'
 BUSINESS_BRANCH_PATTERN='^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}([-_].+)?$'
 HOTFIX_BRANCH_PATTERN='^hotfix-[0-9]{8}$'
@@ -191,7 +196,7 @@ check_diff_size() {
   _GIT_FETCHED_SOURCE="${source_branch}"
 
   # 二进制文件在 numstat 中显示为 "-  -"，awk 下转为 0
-  # 每个二进制文件计 999 行，避免触发 ≤150 行的自动合并
+  # 每个二进制文件计 999 行，避免触发自动合并
   DIFF_TOTAL_LINES="$(git diff --numstat "${_GIT_TARGET_SHA}...${_GIT_SOURCE_SHA}" \
     | awk '{
       if ($1 == "-" && $2 == "-") { added+=999; deleted+=0 }
@@ -200,8 +205,8 @@ check_diff_size() {
 
   echo "变更总行数: ${DIFF_TOTAL_LINES}"
 
-  if [[ "${DIFF_TOTAL_LINES}" -gt 150 ]]; then
-    echo "[WARN] MR 变更超过150行（${DIFF_TOTAL_LINES}行），需要人工审批"
+  if [[ "${DIFF_TOTAL_LINES}" -gt "${AUTO_MERGE_MAX_LINES}" ]]; then
+    echo "[WARN] MR 变更超过${AUTO_MERGE_MAX_LINES}行（${DIFF_TOTAL_LINES}行），需要人工审批"
   else
     pass "MR 变更行数校验通过"
   fi
@@ -320,8 +325,8 @@ main() {
     check_mr_title
     check_merge_base "${MR_SOURCE_BRANCH}" "${MR_TARGET_BRANCH}"
 
-    # ≤150 行直接调 API 自动合并
-    if [[ "${DIFF_TOTAL_LINES}" -le 150 ]]; then
+    # 变更不超过阈值时直接调 API 自动合并
+    if [[ "${DIFF_TOTAL_LINES}" -le "${AUTO_MERGE_MAX_LINES}" ]]; then
       echo "门禁通过，执行自动合并..."
       API_URL="${CI_API_V4_URL:-${CI_SERVER_URL}/api/v4}"
       TOKEN="${GITLAB_PRIVATE_TOKEN}"
